@@ -13,12 +13,15 @@ namespace Test
         {
             var (tinyResolved, tinyReg, tinyRes) = ContainerTest<TinyContainerWrapper>();
             var (autoResolved, autoReg, autoRes) = ContainerTest<AutofacContainerWrapper>();
-            
-            tinyResolved.DoAllTheStuff();
-            autoResolved.DoAllTheStuff();
+            var (windResolved, windReg, windRes) = ContainerTest<WindsorContainerWrapper>();
             
             Console.WriteLine($"TinyIoC: Registration {tinyReg.Ticks / Times}ticks   Resolve: {tinyRes.Ticks / Times}ticks");
             Console.WriteLine($"Autofac: Registration {autoReg.Ticks / Times}ticks   Resolve: {autoRes.Ticks / Times}ticks");
+            Console.WriteLine($"Windsor: Registration {windReg.Ticks / Times}ticks   Resolve: {windRes.Ticks / Times}ticks");
+            
+            tinyResolved.DoAllTheStuff();
+            autoResolved.DoAllTheStuff();
+            windResolved.DoAllTheStuff();
         }
 
         static (IInterface resolved, TimeSpan regTime, TimeSpan resolveTime) ContainerTest<TContainerWrapper>() where TContainerWrapper : ContainerWrapper, new()

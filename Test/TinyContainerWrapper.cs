@@ -5,6 +5,7 @@ namespace Test
     class TinyContainerWrapper : ContainerWrapper
     {
         private readonly TinyIoC _ioc = new TinyIoC();
+        private TinyIoCContainer _container;
         
         public override void Register<T1, T2>()
         {
@@ -18,12 +19,12 @@ namespace Test
 
         public override T Resolve<T>()
         {
-            return _ioc.Resolve<T>();
+            return _container.Resolve<T>();
         }
 
         public override void Build()
         {
-            _ioc.Build();
+            _container = _ioc.Build();
         }
     }
 }

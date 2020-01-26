@@ -5,10 +5,42 @@ using System.Linq;
 
 namespace TinyInversionOfControl
 {
+    public class TinyIoCContainer
+    {
+        private readonly Dictionary<Type, DependencyConstructor> _preferred;
+
+        internal TinyIoCContainer(Dictionary<Type, DependencyConstructor> preferred)
+        {
+            _preferred = preferred;
+        }
+        private object Resolve(Type type, ResolveContext resolveContext)
+        {
+            if (!_preferred.TryGetValue(type, out var dependency)) return ThrowNotRegisteredException();
+            else if (resolveContext.Resolved.TryGetValue(type, out var value)) return value;
+            else if (!resolveContext.ResolvedTypes.Contains(type)) resolveContext.ResolvedTypes.Add(type);
+            else ThrowCircularDependencyException();
+
+            var arguments = dependency.ArgumentTypes.Select(argType => Resolve(argType, resolveContext)).ToArray();
+            var instance = dependency.Constructor(arguments);
+            resolveContext.Resolved[type] = instance;
+            return instance;
+
+            object ThrowNotRegisteredException() => throw new Exception($"{type.Name} is not registered");
+            
+            void ThrowCircularDependencyException()
+            {
+                var circle = string.Join(" -> ", resolveContext.ResolvedTypes.SkipWhile(e => e != type).Select(rt => rt.Name));
+                throw new Exception($"Circular dependency detected {circle} -> {type.Name}");
+            }
+        }
+        public TProvider Resolve<TProvider>()
+        {
+            return (TProvider) Resolve(typeof(TProvider), new ResolveContext());
+        }
+    }
     public class TinyIoC
     {
-        private readonly ConcurrentDictionary<Type, DependencyConstructor[]> _registered = new ConcurrentDictionary<Type, DependencyConstructor[]>();
-        private readonly ConcurrentDictionary<Type, DependencyConstructor> _preferred = new ConcurrentDictionary<Type, DependencyConstructor>();
+        private readonly Dictionary<Type, DependencyConstructor[]> _registered = new Dictionary<Type, DependencyConstructor[]>();
 
         public void Register<TProvider>(bool singleton = false) => InternalRegister<TProvider, TProvider>();
         public void Register<TProvider>(TProvider instance) => InternalRegister<TProvider, TProvider>();
@@ -19,8 +51,10 @@ namespace TinyInversionOfControl
             where TProvider : TInterface
         {
             var dependencyConstructors = GetDependencyConstructors<TProvider>();
-            if (!dependencyConstructors.Any()) throw new Exception("No public constructors found");
+            if (!dependencyConstructors.Any()) ThrowNoPublicConstructors();
             _registered[typeof(TInterface)] = dependencyConstructors;
+            
+            void ThrowNoPublicConstructors() => throw new Exception("No public constructors found");
         }
         
         private static DependencyConstructor[] GetDependencyConstructors<TProvider>()
@@ -32,60 +66,28 @@ namespace TinyInversionOfControl
             }).OrderBy(dependency => dependency.ArgumentTypes.Length).ToArray();
         }
 
-        private object Resolve(Type type, ResolveContext resolveContext)
-        {
-            if (!_registered.TryGetValue(type, out var dependency)) throw new Exception($"{type.Name} is not registered");
-            else if (resolveContext.Resolved.TryGetValue(type, out var value)) return value;
-            else if (!resolveContext.ResolvedTypes.Contains(type)) resolveContext.ResolvedTypes.Add(type);
-            else 
-            {
-                var circle = string.Join(" -> ", resolveContext.ResolvedTypes.SkipWhile(e => e != type).Select(rt => rt.Name));
-                throw new Exception($"Circular dependency detected {circle} -> {type.Name}");
-            }
 
-            var preferredCtor = _preferred[type];
-            if (preferredCtor == null) throw new Exception("No suitable constructor found");
-
-            var arguments = preferredCtor.ArgumentTypes.Select(argType => Resolve(argType, resolveContext)).ToArray();
-            var instance = preferredCtor.Constructor(arguments);
-            resolveContext.Resolved[type] = instance;
-            return instance;
-        }
-        public TProvider Resolve<TProvider>()
+        public TinyIoCContainer Build()
         {
-            return (TProvider) Resolve(typeof(TProvider), new ResolveContext());
-        }
-
-        public void Build()
-        {
+            var preferred = new Dictionary<Type, DependencyConstructor>(); 
             foreach (var (key, dependency) in _registered)
             {
-                _preferred[key] = dependency.FirstOrDefault(ctor => ctor.ArgumentTypes.All(_registered.ContainsKey));
+                var ctor = dependency.FirstOrDefault(ctor => ctor.ArgumentTypes.All(_registered.ContainsKey));
+                preferred[key] = ctor ?? throw new Exception("No suitable constructor found");
             }
+            return new TinyIoCContainer(preferred);
         }
+        
 
-        private class Dependency
-        {
-            public bool Singleton;
-            public DependencyConstructor[] Constructors;
-
-            public DependencyConstructor PreferredConstructor;
-            
-            public Dependency(DependencyConstructor[] constructors)
-            {
-                Constructors = constructors;
-            }
-        }
-        private class DependencyConstructor
-        {
-            public Func<object[], object> Constructor;
-            public Type[] ArgumentTypes;
-        }
-
-        private class ResolveContext
-        {
-            public readonly HashSet<Type> ResolvedTypes = new HashSet<Type>();
-            public readonly Dictionary<Type, object> Resolved = new Dictionary<Type, object>();
-        }
+    }
+    internal class ResolveContext
+    {
+        public readonly HashSet<Type> ResolvedTypes = new HashSet<Type>();
+        public readonly Dictionary<Type, object> Resolved = new Dictionary<Type, object>();
+    }
+    internal class DependencyConstructor
+    {
+        public Func<object[], object> Constructor;
+        public Type[] ArgumentTypes;
     }
 }
