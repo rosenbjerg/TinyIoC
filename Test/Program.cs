@@ -54,42 +54,5 @@ namespace Test
 
             return (obj, DateTime.UtcNow.Subtract(started));
         }
-
-        private static (TinyIoC ioc, TimeSpan registerTime) TinyIoC()
-        {
-            var started = DateTime.UtcNow;
-            
-            var ioc = new TinyInversionOfControl.TinyIoC();
-            ioc.Register<IOther2, Other2>();
-            ioc.Register<IInterface, Classy>();
-            ioc.Register<IInterface2, Class2>();
-            ioc.Register<JustClass>();
-            ioc.Register<IOther3, Other3>();
-            ioc.Register<IInterface1, Class1>();
-            ioc.Register<IOther1, Other1>();
-
-            var registerTime = DateTime.UtcNow.Subtract(started);
-
-            return (ioc, registerTime);
-        }
-        
-        private static (IContainer container, TimeSpan registerTime) Autofac()
-        {
-            var started = DateTime.UtcNow;
-            var builder = new ContainerBuilder();
-            
-            builder.RegisterType<Other2>().As<IOther2>();
-            builder.RegisterType<Classy>().As<IInterface>();
-            builder.RegisterType<Class2>().As<IInterface2>();
-            builder.RegisterType<JustClass>();
-            builder.RegisterType<Other3>().As<IOther3>();
-            builder.RegisterType<Class1>().As<IInterface1>();
-            builder.RegisterType<Other1>().As<IOther1>();
-
-            var container = builder.Build();
-            var registerTime = DateTime.UtcNow.Subtract(started);
-
-            return (container, registerTime);
-        }
     }
 }
