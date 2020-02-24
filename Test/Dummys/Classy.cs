@@ -22,7 +22,6 @@ namespace Test
             _other1.DoStuff();
             _other2.DoMoreStuff();
             _other3.DoFinalStuff();
-            Console.WriteLine(_justClass);
         }
     }
 }

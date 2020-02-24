@@ -7,7 +7,6 @@ namespace Test
         private string _field1 = "1";
         public void Method1()
         {
-            Console.WriteLine(_field1);
         }
     }
 }

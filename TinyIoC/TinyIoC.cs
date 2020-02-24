@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace TinyInversionOfControl
 {
@@ -15,24 +16,25 @@ namespace TinyInversionOfControl
         }
         private object Resolve(Type type, ResolveContext resolveContext)
         {
-            if (!_preferred.TryGetValue(type, out var dependency)) return ThrowNotRegisteredException();
+            if (!_preferred.TryGetValue(type, out var dependency)) return ThrowNotRegisteredException(type);
             else if (resolveContext.Resolved.TryGetValue(type, out var value)) return value;
             else if (!resolveContext.ResolvedTypes.Contains(type)) resolveContext.ResolvedTypes.Add(type);
-            else ThrowCircularDependencyException();
+            else ThrowCircularDependencyException(type, resolveContext.ResolvedTypes);
 
             var arguments = dependency.ArgumentTypes.Select(argType => Resolve(argType, resolveContext)).ToArray();
             var instance = dependency.Constructor(arguments);
             resolveContext.Resolved[type] = instance;
             return instance;
-
-            object ThrowNotRegisteredException() => throw new Exception($"{type.Name} is not registered");
-            
-            void ThrowCircularDependencyException()
-            {
-                var circle = string.Join(" -> ", resolveContext.ResolvedTypes.SkipWhile(e => e != type).Select(rt => rt.Name));
-                throw new Exception($"Circular dependency detected {circle} -> {type.Name}");
-            }
         }
+
+        private static void ThrowCircularDependencyException(Type resolvedType, IEnumerable<Type> resolved)
+        {
+            var circle = string.Join(" -> ", resolved.SkipWhile(e => e != resolvedType).Select(rt => rt.Name));
+            throw new Exception($"Circular dependency detected {circle} -> {resolvedType.Name}");
+        }
+
+        private static object ThrowNotRegisteredException(MemberInfo resolveType) => throw new Exception($"{resolveType.Name} is not registered");
+
         public TProvider Resolve<TProvider>()
         {
             return (TProvider) Resolve(typeof(TProvider), new ResolveContext());
@@ -79,6 +81,25 @@ namespace TinyInversionOfControl
         }
         
 
+    }
+
+    internal enum ResolveStyle
+    {
+        
+    }
+    internal abstract class Dependency
+    {
+        public Type Type;
+        public DependencyConstructor[] Constructors;
+        public ResolveStyle ResolveStyle;
+        public Dictionary<object, object> ConstructorMap;
+
+        protected Dependency(Type type, ResolveStyle resolveStyle, DependencyConstructor[] constructors)
+        {
+            Type = type;
+            Constructors = constructors;
+            ResolveStyle = resolveStyle;
+        }
     }
     internal class ResolveContext
     {

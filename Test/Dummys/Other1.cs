@@ -14,7 +14,6 @@ namespace Test
         {
             if (_other2 == null)
             {
-                Console.WriteLine("None");
             }
         }
     }

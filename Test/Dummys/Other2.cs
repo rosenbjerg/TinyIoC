@@ -15,7 +15,7 @@ namespace Test
         public void DoMoreStuff()
         {
             if (_interface1 != null)
-                Console.WriteLine(_interface2.Sideeffect());
+                _interface2.Sideeffect();
         }
     }
 }

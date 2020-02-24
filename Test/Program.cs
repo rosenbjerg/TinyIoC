@@ -1,6 +1,11 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Autofac;
+using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Environments;
+using BenchmarkDotNet.Jobs;
+using BenchmarkDotNet.Running;
 using TinyInversionOfControl;
 
 namespace Test
@@ -11,36 +16,44 @@ namespace Test
         
         static void Main(string[] args)
         {
-            var (tinyResolved, tinyReg, tinyRes) = ContainerTest<TinyContainerWrapper>();
-            var (autoResolved, autoReg, autoRes) = ContainerTest<AutofacContainerWrapper>();
-            var (windResolved, windReg, windRes) = ContainerTest<WindsorContainerWrapper>();
-            
-            Console.WriteLine($"TinyIoC: Registration {tinyReg.Ticks / Times}ticks   Resolve: {tinyRes.Ticks / Times}ticks");
-            Console.WriteLine($"Autofac: Registration {autoReg.Ticks / Times}ticks   Resolve: {autoRes.Ticks / Times}ticks");
-            Console.WriteLine($"Windsor: Registration {windReg.Ticks / Times}ticks   Resolve: {windRes.Ticks / Times}ticks");
-            
-            tinyResolved.DoAllTheStuff();
-            autoResolved.DoAllTheStuff();
-            windResolved.DoAllTheStuff();
+            var summary = BenchmarkRunner.Run<Bench>();
+            Console.WriteLine(summary);
         }
 
-        static (IInterface resolved, TimeSpan regTime, TimeSpan resolveTime) ContainerTest<TContainerWrapper>() where TContainerWrapper : ContainerWrapper, new()
+        
+    }
+    [SimpleJob(RuntimeMoniker.NetCoreApp31, baseline: true)]
+    public class Bench
+    {
+        [Benchmark(Baseline = true)]
+        public void TinyBench()
         {
-            var (container, regTime) = Test(Times, () =>
-            {
-                var c = new TContainerWrapper();
-                c.Register<IOther2, Other2>();
-                c.Register<IInterface, Classy>();
-                c.Register<IInterface2, Class2>();
-                c.Register<JustClass>();
-                c.Register<IOther3, Other3>();
-                c.Register<IInterface1, Class1>();
-                c.Register<IOther1, Other1>();
-                c.Build();
-                return c;
-            });
-            var (resolved, resolveTime) = Test(Times, () => container.Resolve<IInterface>());
-            return (resolved, regTime, resolveTime);
+            ContainerTest<TinyContainerWrapper>();
+        }
+        [Benchmark]
+        public void AutoBench()
+        {
+            ContainerTest<AutofacContainerWrapper>();
+        }
+        [Benchmark]
+        public void CastleBench()
+        {
+            ContainerTest<WindsorContainerWrapper>();
+        }
+
+        static void ContainerTest<TContainerWrapper>() where TContainerWrapper : ContainerWrapper, new()
+        {
+            var c = new TContainerWrapper();
+            c.Register<IOther2, Other2>();
+            c.Register<IInterface, Classy>();
+            c.Register<IInterface2, Class2>();
+            c.Register<JustClass>();
+            c.Register<IOther3, Other3>();
+            c.Register<IInterface1, Class1>();
+            c.Register<IOther1, Other1>();
+            c.Build();
+            var resolved = c.Resolve<IInterface>();
+            resolved.DoAllTheStuff();
         }
         static (T obj, TimeSpan) Test<T>(int times, Func<T> action)
         {
